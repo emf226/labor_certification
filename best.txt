@@ -1,0 +1,72 @@
+Reordering variables and trying again:
+Subset selection object
+Call: regsubsets.formula(CASE_STATUS ~ ., data = labor, nbest = 5, 
+    method = "exhaustive", really.big = TRUE)
+63 Variables  (and intercept)
+                                         Forced in Forced out
+DECISION_DATE                                FALSE      FALSE
+PW_LEVEL_9089Level I                         FALSE      FALSE
+PW_LEVEL_9089Level II                        FALSE      FALSE
+PW_LEVEL_9089Level III                       FALSE      FALSE
+PW_AMOUNT_9089                               FALSE      FALSE
+JOB_INFO_EDUCATIONOther                      FALSE      FALSE
+JOB_INFO_EDUCATIONHigh School                FALSE      FALSE
+JOB_INFO_EDUCATIONAssociate's                FALSE      FALSE
+JOB_INFO_EDUCATIONBachelor's                 FALSE      FALSE
+JOB_INFO_EDUCATIONMaster's                   FALSE      FALSE
+JOB_INFO_EDUCATIONDoctorate                  FALSE      FALSE
+JOB_INFO_EXPERIENCEN                         FALSE      FALSE
+RECR_INFO_PROFESSIONAL_OCCN                  FALSE      FALSE
+RECR_INFO_COLL_UNIV_TEACHERN                 FALSE      FALSE
+FOREIGN_WORKER_INFO_STATEMidAtlantic         FALSE      FALSE
+FOREIGN_WORKER_INFO_STATESouth               FALSE      FALSE
+FOREIGN_WORKER_INFO_STATEMidwest             FALSE      FALSE
+FOREIGN_WORKER_INFO_STATESouthwest           FALSE      FALSE
+FOREIGN_WORKER_INFO_STATEWest                FALSE      FALSE
+REGIONASIA                                   FALSE      FALSE
+REGIONAFRICA                                 FALSE      FALSE
+REGIONLATIN AMERICA                          FALSE      FALSE
+REGIONOCEANIA                                FALSE      FALSE
+REGIONEUROPE                                 FALSE      FALSE
+REGIONMIDDLE EAST                            FALSE      FALSE
+CLASS_OF_ADMISSIONB-1                        FALSE      FALSE
+CLASS_OF_ADMISSIONB-2                        FALSE      FALSE
+CLASS_OF_ADMISSIONE-1                        FALSE      FALSE
+CLASS_OF_ADMISSIONE-2                        FALSE      FALSE
+CLASS_OF_ADMISSIONE-3                        FALSE      FALSE
+CLASS_OF_ADMISSIONEWI                        FALSE      FALSE
+CLASS_OF_ADMISSIONF-1                        FALSE      FALSE
+CLASS_OF_ADMISSIONF-2                        FALSE      FALSE
+CLASS_OF_ADMISSIONG-4                        FALSE      FALSE
+CLASS_OF_ADMISSIONG-5                        FALSE      FALSE
+CLASS_OF_ADMISSIONH-1B                       FALSE      FALSE
+CLASS_OF_ADMISSIONH-1B1                      FALSE      FALSE
+CLASS_OF_ADMISSIONH-2A                       FALSE      FALSE
+CLASS_OF_ADMISSIONH-2B                       FALSE      FALSE
+CLASS_OF_ADMISSIONH-3                        FALSE      FALSE
+CLASS_OF_ADMISSIONH-4                        FALSE      FALSE
+CLASS_OF_ADMISSIONJ-1                        FALSE      FALSE
+CLASS_OF_ADMISSIONJ-2                        FALSE      FALSE
+CLASS_OF_ADMISSIONL-1                        FALSE      FALSE
+CLASS_OF_ADMISSIONO-1                        FALSE      FALSE
+CLASS_OF_ADMISSIONO-2                        FALSE      FALSE
+CLASS_OF_ADMISSIONO-3                        FALSE      FALSE
+CLASS_OF_ADMISSIONP-1                        FALSE      FALSE
+CLASS_OF_ADMISSIONP-3                        FALSE      FALSE
+CLASS_OF_ADMISSIONParolee                    FALSE      FALSE
+CLASS_OF_ADMISSIONTN                         FALSE      FALSE
+CLASS_OF_ADMISSIONTPS                        FALSE      FALSE
+CLASS_OF_ADMISSIONVWT                        FALSE      FALSE
+FOREIGN_WORKER_INFO_EDUCATIONOther           FALSE      FALSE
+FOREIGN_WORKER_INFO_EDUCATIONHigh School     FALSE      FALSE
+FOREIGN_WORKER_INFO_EDUCATIONAssociate's     FALSE      FALSE
+FOREIGN_WORKER_INFO_EDUCATIONBachelor's      FALSE      FALSE
+FOREIGN_WORKER_INFO_EDUCATIONMaster's        FALSE      FALSE
+FOREIGN_WORKER_INFO_EDUCATIONDoctorate       FALSE      FALSE
+ADMINTrump                                   FALSE      FALSE
+PW_LEVEL_9089Level IV                        FALSE      FALSE
+FOREIGN_WORKER_INFO_STATENA                  FALSE      FALSE
+CLASS_OF_ADMISSIONNot in USA                 FALSE      FALSE
+5 subsets of each size up to 9
+Selection Algorithm: exhaustive
+Warning message:

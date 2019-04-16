@@ -3,10 +3,31 @@ library(ggmosaic)
 library(lmtest)
 library(data.table)
 
+
+states_to_regions <- function(labor) {
+  # change states to regions
+  US_REGION_LABELS <- c('NewEngland', 'MidAtlantic', 'South', 'Midwest', 'Southwest', 'West', 'NA')
+  US_REGION_STATES <- list(c('ME', 'MA', 'NH', 'RI', 'VT', 'CT'), c('DE', 'MD', 'NJ', 'NY', 'PA'), 
+                           c('AL', 'AR', 'FL', 'GA', 'KY', 'LA', 'MS', 'MO', 'NC', 'SC', 'TN', 'VA', 'WV'),
+                           c('IL', 'IN', 'IA', 'KS', 'MI', 'MN', 'NE', 'ND', 'OH', 'SD', 'WI'),
+                           c('AZ', 'NM', 'OK', 'TX'), c('AK', 'CA', 'CO', 'HI', 'ID', 'MT', 'NV', 'OR', 'UT', 'WA', 'WY'))
+  us_region <- function(lst, states, region) {sapply(lst, FUN=function(x) {ifelse(x %in% states, region, x)} )}
+  
+  for (k in 1:length(US_REGION_STATES)) {
+    labor$FOREIGN_WORKER_INFO_STATE <- us_region(labor$FOREIGN_WORKER_INFO_STATE, US_REGION_STATES[[k]], US_REGION_LABELS[[k]])
+  }
+  labor$FOREIGN_WORKER_INFO_STATE[labor$FOREIGN_WORKER_INFO_STATE==""] <- 'NA'
+  labor$FOREIGN_WORKER_INFO_STATE <- factor(labor$FOREIGN_WORKER_INFO_STATE, levels=US_REGION_LABELS)
+  return(labor)
+}
+
+
 clean_dataset <- function() {
   labor <- read.csv('~/Dropbox/STSCI/STSCI4110/Prelim2/Labor_Cert_FY2016_19_V1_Posted.csv', 
                     sep=',', stringsAsFactors=FALSE)
   orig_n_rows <- nrow(labor)
+  # Remove row with US citizenship
+  labor <- subset(x=labor, subset=labor$COUNTRY_OF_CITIZENSHIP != 'UNITED STATES OF AMERICA')
   
   unused_preds <- c('ID', 'CASE_NUMBER', 'COUNTRY_OF_CITIZENSHIP', 'PW_Job_Title_9089', 'JOB_INFO_JOB_TITLE', 'PW_UNIT_OF_PAY_9089')
   labor <- labor[!(names(labor) %in% unused_preds)]
@@ -30,16 +51,11 @@ clean_dataset <- function() {
   labor$JOB_INFO_EDUCATION <- factor(labor$JOB_INFO_EDUCATION, levels=education)
   labor$FOREIGN_WORKER_INFO_EDUCATION <- factor(labor$FOREIGN_WORKER_INFO_EDUCATION, levels=education)
   
-  
-  # Remove row with US citizenship
-  labor <- labor[-c(62,344,348,1074,2223,2465,2536,2679,2704,184),]
-  no_decision_date <- subset(x=labor, subset=is.na(labor$DECISION_DATE))
-  
+
   labor <- subset(x=labor, subset=!is.na(labor$PW_AMOUNT_9089))
   print(sprintf('Removed %d rows', orig_n_rows-nrow(labor)))
-  labor <- subset(x=labor, subset=!is.na(labor$DECISION_DATE))
-  print(sprintf('Removed %d rows', orig_n_rows-nrow(labor)))
-  
+
+  labor <- states_to_regions(labor)
   return(labor)
 }
 
@@ -47,78 +63,17 @@ clean_dataset <- function() {
 labor <- clean_dataset()
 
 
-# change states to regions
-US_REGION_LABELS <- c('NewEngland', 'MidAtlantic', 'South', 'Midwest', 'Southwest', 'West', 'NA')
-US_REGION_STATES <- list(c('ME', 'MA', 'NH', 'RI', 'VT', 'CT'), c('DE', 'MD', 'NJ', 'NY', 'PA'), 
-                         c('AL', 'AR', 'FL', 'GA', 'KY', 'LA', 'MS', 'MO', 'NC', 'SC', 'TN', 'VA', 'WV'),
-                         c('IL', 'IN', 'IA', 'KS', 'MI', 'MN', 'NE', 'ND', 'OH', 'SD', 'WI'),
-                         c('AZ', 'NM', 'OK', 'TX'), c('AK', 'CA', 'CO', 'HI', 'ID', 'MT', 'NV', 'OR', 'UT', 'WA', 'WY'))
-us_region <- function(lst, states, region) {sapply(lst, FUN=function(x) {ifelse(x %in% states, region, x)} )}
-
-for (k in 1:length(US_REGION_STATES)) {
-  labor$FOREIGN_WORKER_INFO_STATE <- us_region(labor$FOREIGN_WORKER_INFO_STATE, US_REGION_STATES[[k]], US_REGION_LABELS[[k]])
-}
-labor$FOREIGN_WORKER_INFO_STATE[labor$FOREIGN_WORKER_INFO_STATE==""] <- 'NA'
-labor$FOREIGN_WORKER_INFO_STATE <- factor(labor$FOREIGN_WORKER_INFO_STATE, levels=US_REGION_LABELS)
 
 
 
 
-aicm<-glm(formula = CASE_STATUS ~ ADMIN + PW_AMOUNT_9089 + JOB_INFO_EXPERIENCE + JOB_INFO_EDUCATION
+aicm <- glm(formula = CASE_STATUS ~ ADMIN + PW_AMOUNT_9089 + JOB_INFO_EXPERIENCE + JOB_INFO_EDUCATION
           + RECR_INFO_COLL_UNIV_TEACHER + RECR_INFO_PROFESSIONAL_OCC + REGION + DECISION_DATE, 
           family = 'binomial', data = labor)
 
 
-salaries <- seq(from=min(labor$PW_AMOUNT_9089, na.rm=TRUE), to=max(labor$PW_AMOUNT_9089, na.rm=TRUE), by=1000)
 
 
-create_newdata <- function(predictor) {
-  salaries <- seq(from=min(labor$PW_AMOUNT_9089, na.rm=TRUE), to=max(labor$PW_AMOUNT_9089, na.rm=TRUE), by=1000)
-  n <- 273 * length(levels(labor[[predictor]]))
-  print(n)
-  
-  newdata_df <- data.frame(
-    PW_AMOUNT_9089 = rep(salaries, length(levels(labor[[predictor]])) ),
-    ADMIN = factor(rep('Trump', n), levels=c('Obama', 'Trump')),
-    JOB_INFO_EXPERIENCE = factor(rep('Y', n), levels=c('Y', 'N')),
-    JOB_INFO_EDUCATION = factor(rep('Bachelor\'s', n), levels=education),
-    RECR_INFO_COLL_UNIV_TEACHER = factor(rep('N', n), levels=c('Y', 'N')),
-    RECR_INFO_PROFESSIONAL_OCC = factor(rep('Y', n), levels=c('Y', 'N')),
-    REGION = factor(rep('ASIA', n), levels=regions),
-    DECISION_DATE = rep(median(labor$DECISION_DATE, na.rm=TRUE), n)
-  )
-  newdata_df[[predictor]] <- factor(sapply(levels(labor[[predictor]]), FUN=function(r) {rep(r, 273)}))
-  return(newdata_df)
-}
-
-n_certified <- length(labor$CASE_STATUS[labor$CASE_STATUS == 'Certified'])
-n_denied <- length(labor$CASE_STATUS[labor$CASE_STATUS == 'Denied'])
-threshold <- n_denied / (n_certified + n_denied)
-
-obama <- subset(x=labor, subset=labor$ADMIN == 'Obama')
-trump <- subset(x=labor, subset=labor$ADMIN == 'Trump')
-
-estimated_prob_plot <- function(newdata, xvar, fontsize=26) {
-  newdata$CASE_STATUS <- 1 - predict(aicm, type='response', newdata=newdata)
-  newdata$COLOR <- newdata[[xvar]]
-  eprob_plot <- ggplot(data=newdata) +
-    geom_path(aes(x=PW_AMOUNT_9089, y=CASE_STATUS, color=COLOR), show.legend=TRUE, size=4, lineend='round') + 
-    labs(x='PW_AMOUNT_9089', y='P(CASE_STATUS) == \'Certified\'', title='Estimated Probability that an Applicant Is Certified') +
-    labs(color = xvar) +
-    theme(axis.title=element_text(size=30, face='bold'), axis.text.x=element_text(size=30)) +
-    theme(axis.text.y=element_text(size=fontsize, face='bold')) +
-    theme(plot.title=element_text(size=30, face='bold'))  +
-    theme(legend.title=element_text(size=30, face='bold'), legend.text=element_text(size=22))
-  
-  ggsave(filename=sprintf('~/Dropbox/STSCI/STSCI4110/Prelim2/plots/%s_estimated_prob_plot.png', xvar), plot=eprob_plot, width=16, height=10)
-  return(eprob_plot)
-}
-
-region_df <- create_newdata('REGION')
-admin_df <- create_newdata('ADMIN')
-admin_df$DECISION_DATE <- c(rep(median(obama$DECISION_DATE), 273), rep(median(trump$DECISION_DATE), 273))
-estimated_prob_plot(region_df, 'REGION')
-estimated_prob_plot(admin_df, 'ADMIN')
 
 #**** INTERACTION TESTS *****#
 predictors <- names(labor)

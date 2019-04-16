@@ -21,8 +21,11 @@ labor$JOB_INFO_EXPERIENCE <- factor(labor$JOB_INFO_EXPERIENCE, levels=c('Y', 'N'
 labor$RECR_INFO_PROFESSIONAL_OCC <- factor(labor$RECR_INFO_PROFESSIONAL_OCC, levels=c('Y', 'N'))
 labor$RECR_INFO_COLL_UNIV_TEACHER <- factor(labor$RECR_INFO_COLL_UNIV_TEACHER, levels=c('Y', 'N'))
 labor$PW_LEVEL_9089 <- factor(labor$PW_LEVEL_9089, levels=c('N/A', 'Level I', 'Level II', 'Level III', 'Level IV'))
-labor$REGION <- factor(labor$REGION, levels=c('CANADA', 'ASIA', 'AFRICA', 'LATIN AMERICA', 'OCEANIA', 'EUROPE', 'MIDDLE EAST'))
+
+regions <- c('CANADA', 'ASIA', 'AFRICA', 'LATIN AMERICA', 'OCEANIA', 'EUROPE', 'MIDDLE EAST')
+labor$REGION <- factor(labor$REGION, levels=regions)
 labor$CLASS_OF_ADMISSION <- factor(labor$CLASS_OF_ADMISSION)
+
 education <- c('None', 'Other', 'High School', 'Associate\'s', 'Bachelor\'s', 'Master\'s', 'Doctorate')
 labor$JOB_INFO_EDUCATION <- factor(labor$JOB_INFO_EDUCATION, levels=education)
 labor$FOREIGN_WORKER_INFO_EDUCATION <- factor(labor$FOREIGN_WORKER_INFO_EDUCATION, levels=education)
@@ -54,6 +57,62 @@ labor$FOREIGN_WORKER_INFO_STATE[labor$FOREIGN_WORKER_INFO_STATE==""] <- 'NA'
 labor$FOREIGN_WORKER_INFO_STATE <- factor(labor$FOREIGN_WORKER_INFO_STATE, levels=US_REGION_LABELS)
 
 
+aicm<-glm(formula = CASE_STATUS ~ ADMIN + PW_AMOUNT_9089 + JOB_INFO_EXPERIENCE + JOB_INFO_EDUCATION
+            + RECR_INFO_COLL_UNIV_TEACHER + RECR_INFO_PROFESSIONAL_OCC + REGION + DECISION_DATE, 
+          family = 'binomial', data = labor)
+
+
+salaries <- seq(from=min(labor$PW_AMOUNT_9089, na.rm=TRUE), to=max(labor$PW_AMOUNT_9089, na.rm=TRUE), by=1000)
+
+
+create_newdata <- function(predictor) {
+  salaries <- seq(from=min(labor$PW_AMOUNT_9089, na.rm=TRUE), to=max(labor$PW_AMOUNT_9089, na.rm=TRUE), by=1000)
+  n <- 273 * length(levels(labor[[predictor]]))
+  print(n)
+  
+  newdata_df <- data.frame(
+    PW_AMOUNT_9089 = rep(salaries, length(levels(labor[[predictor]])) ),
+    ADMIN = factor(rep('Trump', n), levels=c('Obama', 'Trump')),
+    JOB_INFO_EXPERIENCE = factor(rep('Y', n), levels=c('Y', 'N')),
+    JOB_INFO_EDUCATION = factor(rep('Bachelor\'s', n), levels=education),
+    RECR_INFO_COLL_UNIV_TEACHER = factor(rep('N', n), levels=c('Y', 'N')),
+    RECR_INFO_PROFESSIONAL_OCC = factor(rep('Y', n), levels=c('Y', 'N')),
+    REGION = factor(rep('ASIA', n), levels=regions),
+    DECISION_DATE = rep(median(labor$DECISION_DATE, na.rm=TRUE), n)
+  )
+  newdata_df[[predictor]] <- factor(sapply(levels(labor[[predictor]]), FUN=function(r) {rep(r, 273)}))
+  return(newdata_df)
+}
+
+n_certified <- length(labor$CASE_STATUS[labor$CASE_STATUS == 'Certified'])
+n_denied <- length(labor$CASE_STATUS[labor$CASE_STATUS == 'Denied'])
+threshold <- n_denied / (n_certified + n_denied)
+
+obama <- subset(x=labor, subset=labor$ADMIN == 'Obama')
+trump <- subset(x=labor, subset=labor$ADMIN == 'Trump')
+
+estimated_prob_plot <- function(newdata, xvar, fontsize=26) {
+  newdata$CASE_STATUS <- 1 - predict(aicm, type='response', newdata=newdata)
+  newdata$COLOR <- newdata[[xvar]]
+  eprob_plot <- ggplot(data=newdata) +
+    geom_path(aes(x=PW_AMOUNT_9089, y=CASE_STATUS, color=COLOR), show.legend=TRUE, size=4, lineend='round') + 
+    labs(x='PW_AMOUNT_9089', y='P(CASE_STATUS) == \'Certified\'', title='Estimated Probability that an Applicant Is Certified') +
+    labs(color = xvar) +
+    theme(axis.title=element_text(size=30, face='bold'), axis.text.x=element_text(size=30)) +
+    theme(axis.text.y=element_text(size=fontsize, face='bold')) +
+    theme(plot.title=element_text(size=30, face='bold'))  +
+    theme(legend.title=element_text(size=30, face='bold'), legend.text=element_text(size=22))
+  
+  ggsave(filename=sprintf('~/Dropbox/STSCI/STSCI4110/Prelim2/plots/%s_estimated_prob_plot.png', xvar), plot=eprob_plot, width=16, height=10)
+  return(eprob_plot)
+}
+
+region_df <- create_newdata('REGION')
+admin_df <- create_newdata('ADMIN')
+admin_df$DECISION_DATE <- c(rep(median(obama$DECISION_DATE), 273), rep(median(trump$DECISION_DATE), 273))
+estimated_prob_plot(region_df, 'REGION')
+estimated_prob_plot(admin_df, 'ADMIN')
+
 #**** INTERACTION TESTS *****#
 predictors <- names(labor)
 predictors <- predictors[!predictors %in% c('CASE_STATUS', 'DECISION_DATE', 'CLASS_OF_ADMISSION')]
@@ -79,7 +138,7 @@ for (j in 1:length(pred_interactions)) {
   print(j)
   print(coef(summary(pred_interactions[[j]]))[,4])
   
-  filename <- sprintf('~/Dropbox/STSCI/STSCI4110/Prelim2/pvals/pvals_%s.csv', pred_formulas[[j]])
+  filename <- sprintf('~/Dropbox/STSCI/STSCI4110/Prelim2/pvals_by_predictor_names/pvals_%s.csv', pred_formulas[[j]])
   write.csv(coef(summary(pred_interactions[[j]])), file=filename)
 }
 ##############################
@@ -192,33 +251,34 @@ ts <- 3817.6-3572.1
 1-pchisq(ts,6)
 
 
-mosaic_plot <- function(xvar, ylabel, xlabel='Application Status') {
+mosaic_plot <- function(xvar, ylabel, xlabel='Application Status', fontsize=26) {
   mosaic_df <- data.frame(x=labor[[xvar]], CASE_STATUS=labor$CASE_STATUS)
   mosaic <- ggplot(data=mosaic_df) +
-    geom_mosaic(aes(x=product(x, CASE_STATUS), fill=x), na.rm=TRUE) + 
+    geom_mosaic(aes(x=product(x, CASE_STATUS), fill=x), na.rm=TRUE, show.legend=FALSE) + 
     labs(x=xlabel, y=ylabel, title=sprintf('%s and %s', xlabel, ylabel)) +
-    theme(axis.title=element_text(size=30), axis.text=element_text(size=26, face='bold')) +
+    theme(axis.title=element_text(size=30), axis.text.x=element_text(size=30, face='bold')) +
+    theme(axis.text.y=element_text(size=fontsize, face='bold')) +
     theme(plot.title=element_text(size=38, face='bold'))
-  ggsave(filename=sprintf('~/Dropbox/STSCI/STSCI4110/plots/%s_plot.png', xvar), plot=mosaic, width=13, height=9)
+  ggsave(filename=sprintf('~/Dropbox/STSCI/STSCI4110/Prelim2/plots/%s_plot.png', xvar), plot=mosaic, width=13, height=10)
   return(mosaic)
 }
 
-mosaic_plot(xvar='ADMIN', ylabel='Administration', xlabel='Application Status')
-mosaic_plot(xvar='PW_LEVEL_9089', ylabel='PW Level', xlabel='Application Status')
-mosaic_plot(xvar='JOB_INFO_EDUCATION', xlabel='Application Status', ylabel='Job Application')
-mosaic_plot(xvar='JOB_INFO_EXPERIENCE',ylabel='Job Experience', xlabel='Application Status')
-mosaic_plot(xvar='RECR_INFO_PROFESSIONAL_OCC', xlabel='Application Status', ylabel='Rec Professional')
-mosaic_plot(xvar='RECR_INFO_COLL_UNIV_TEACHER', xlabel='Status', ylabel='Rec College or University')
-mosaic_plot(xvar='REGION', xlabel='Application Status', ylabel='Region')
-mosaic_plot(xvar='FOREIGN_WORKER_INFO_EDUCATION', xlabel='Status', ylabel='Foreign Worker Education')
-mosaic_plot(xvar='FOREIGN_WORKER_INFO_STATE', xlabel='Status', ylabel='Foreign Worker State')
-
+mosaic_plot(xvar='ADMIN', ylabel='Administration', fontsize=30)
+mosaic_plot(xvar='PW_LEVEL_9089', ylabel='PW Level', fontsize=30)
+mosaic_plot(xvar='JOB_INFO_EDUCATION', ylabel='Job Application', fontsize=28)
+mosaic_plot(xvar='JOB_INFO_EXPERIENCE', ylabel='Job Experience', fontsize=46)
+mosaic_plot(xvar='RECR_INFO_PROFESSIONAL_OCC', ylabel='Rec Professional', fontsize=46)
+mosaic_plot(xvar='RECR_INFO_COLL_UNIV_TEACHER', ylabel='Rec College or University', fontsize=46)
+mosaic_plot(xvar='REGION', ylabel='Region', fontsize=30)
+mosaic_plot(xvar='FOREIGN_WORKER_INFO_EDUCATION', xlabel='Status', ylabel='Foreign Worker Education', fontsize=30)
+mosaic_plot(xvar='FOREIGN_WORKER_INFO_STATE', xlabel='Status', ylabel='Foreign Worker State', fontsize=32)
+mosaic_plot(xvar='CLASS_OF_ADMISSION', ylabel='Class of Admission', fontsize=14)
 
 
 
 #HISTOGRAM FOR AMOUNT
 pw_amount_hist <- ggplot(data=labor) +
-    geom_histogram(mapping = aes(x=PW_AMOUNT_9089), bins=100, breaks=seq(from=0, to=300000, by=10000)) +
+    geom_histogram(mapping = aes(x=PW_AMOUNT_9089, color=CASE_STATUS), bins=100, breaks=seq(from=0, to=300000, by=10000)) +
     labs(x='PW_AMOUNT_9089', title='PW_AMOUNT_9089 Histogram') +
     theme(axis.title=element_text(size=30), axis.text=element_text(size=22, face='bold')) +
     theme(plot.title=element_text(size=38, face='bold'))
@@ -227,7 +287,7 @@ ggsave(filename='~/Dropbox/STSCI/STSCI4110/plots/PW_AMOUNT_9089_plot.png', plot=
 
 
 decision_date_hist <- ggplot(data=labor) +
-  geom_histogram(mapping = aes(x=DECISION_DATE), bins=100) +
+  geom_histogram(mapping = aes(x=DECISION_DATE, color=CASE_STATUS), bins=100) +
   labs(x='DECISION_DATE', title='DECISION_DATE Histogram') +
   theme(axis.title=element_text(size=30), axis.text=element_text(size=26, face='bold')) +
   theme(plot.title=element_text(size=38, face='bold'))

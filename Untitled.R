@@ -3,43 +3,48 @@ library(ggmosaic)
 library(lmtest)
 library(data.table)
 
-labor <- read.csv('~/Dropbox/STSCI/STSCI4110/Prelim2/Labor_Cert_FY2016_19_V1_Posted.csv', 
-                  sep=',', stringsAsFactors=FALSE)
-orig_n_rows <- nrow(labor)
+clean_dataset <- function() {
+  labor <- read.csv('~/Dropbox/STSCI/STSCI4110/Prelim2/Labor_Cert_FY2016_19_V1_Posted.csv', 
+                    sep=',', stringsAsFactors=FALSE)
+  orig_n_rows <- nrow(labor)
+  
+  unused_preds <- c('ID', 'CASE_NUMBER', 'COUNTRY_OF_CITIZENSHIP', 'PW_Job_Title_9089', 'JOB_INFO_JOB_TITLE', 'PW_UNIT_OF_PAY_9089')
+  labor <- labor[!(names(labor) %in% unused_preds)]
+  
+  labor$DECISION_DATE <- as.Date(labor$DECISION_DATE, format='%m/%d/%y')
+  
+  labor$PW_AMOUNT_9089 <- sapply(labor$PW_AMOUNT_9089, FUN=function(y) {sub(',', '', y)})
+  labor$PW_AMOUNT_9089 <- as.numeric(labor$PW_AMOUNT_9089)
+  labor$ADMIN <- factor(labor$ADMIN, levels=c('Obama', 'Trump'))
+  labor$CASE_STATUS <- factor(labor$CASE_STATUS, levels=c('Certified', 'Denied'))
+  labor$JOB_INFO_EXPERIENCE <- factor(labor$JOB_INFO_EXPERIENCE, levels=c('Y', 'N'))
+  labor$RECR_INFO_PROFESSIONAL_OCC <- factor(labor$RECR_INFO_PROFESSIONAL_OCC, levels=c('Y', 'N'))
+  labor$RECR_INFO_COLL_UNIV_TEACHER <- factor(labor$RECR_INFO_COLL_UNIV_TEACHER, levels=c('Y', 'N'))
+  labor$PW_LEVEL_9089 <- factor(labor$PW_LEVEL_9089, levels=c('N/A', 'Level I', 'Level II', 'Level III', 'Level IV'))
+  
+  regions <- c('CANADA', 'ASIA', 'AFRICA', 'LATIN AMERICA', 'OCEANIA', 'EUROPE', 'MIDDLE EAST')
+  labor$REGION <- factor(labor$REGION, levels=regions)
+  labor$CLASS_OF_ADMISSION <- factor(labor$CLASS_OF_ADMISSION)
+  
+  education <- c('None', 'Other', 'High School', 'Associate\'s', 'Bachelor\'s', 'Master\'s', 'Doctorate')
+  labor$JOB_INFO_EDUCATION <- factor(labor$JOB_INFO_EDUCATION, levels=education)
+  labor$FOREIGN_WORKER_INFO_EDUCATION <- factor(labor$FOREIGN_WORKER_INFO_EDUCATION, levels=education)
+  
+  
+  # Remove row with US citizenship
+  labor <- labor[-c(62,344,348,1074,2223,2465,2536,2679,2704,184),]
+  no_decision_date <- subset(x=labor, subset=is.na(labor$DECISION_DATE))
+  
+  labor <- subset(x=labor, subset=!is.na(labor$PW_AMOUNT_9089))
+  print(sprintf('Removed %d rows', orig_n_rows-nrow(labor)))
+  labor <- subset(x=labor, subset=!is.na(labor$DECISION_DATE))
+  print(sprintf('Removed %d rows', orig_n_rows-nrow(labor)))
+  
+  return(labor)
+}
 
-unused_preds <- c('ID', 'CASE_NUMBER', 'COUNTRY_OF_CITIZENSHIP', 'PW_Job_Title_9089', 'JOB_INFO_JOB_TITLE', 'PW_UNIT_OF_PAY_9089')
-labor <- labor[!(names(labor) %in% unused_preds)]
 
-labor$DECISION_DATE <- as.Date(labor$DECISION_DATE, format='%m/%d/%y')
-
-labor$PW_AMOUNT_9089 <- sapply(labor$PW_AMOUNT_9089, FUN=function(y) {sub(',', '', y)})
-labor$PW_AMOUNT_9089 <- as.numeric(labor$PW_AMOUNT_9089)
-
-labor$ADMIN <- factor(labor$ADMIN, levels=c('Obama', 'Trump'))
-labor$CASE_STATUS <- factor(labor$CASE_STATUS, levels=c('Certified', 'Denied'))
-labor$JOB_INFO_EXPERIENCE <- factor(labor$JOB_INFO_EXPERIENCE, levels=c('Y', 'N'))
-labor$RECR_INFO_PROFESSIONAL_OCC <- factor(labor$RECR_INFO_PROFESSIONAL_OCC, levels=c('Y', 'N'))
-labor$RECR_INFO_COLL_UNIV_TEACHER <- factor(labor$RECR_INFO_COLL_UNIV_TEACHER, levels=c('Y', 'N'))
-labor$PW_LEVEL_9089 <- factor(labor$PW_LEVEL_9089, levels=c('N/A', 'Level I', 'Level II', 'Level III', 'Level IV'))
-
-regions <- c('CANADA', 'ASIA', 'AFRICA', 'LATIN AMERICA', 'OCEANIA', 'EUROPE', 'MIDDLE EAST')
-labor$REGION <- factor(labor$REGION, levels=regions)
-labor$CLASS_OF_ADMISSION <- factor(labor$CLASS_OF_ADMISSION)
-
-education <- c('None', 'Other', 'High School', 'Associate\'s', 'Bachelor\'s', 'Master\'s', 'Doctorate')
-labor$JOB_INFO_EDUCATION <- factor(labor$JOB_INFO_EDUCATION, levels=education)
-labor$FOREIGN_WORKER_INFO_EDUCATION <- factor(labor$FOREIGN_WORKER_INFO_EDUCATION, levels=education)
-
-
-# Remove row with US citizenship
-labor <- labor[-c(62,344,348,1074,2223,2465,2536,2679,2704,184),]
-no_decision_date <- subset(x=labor, subset=is.na(labor$DECISION_DATE))
-
-labor <- subset(x=labor, subset=!is.na(labor$PW_AMOUNT_9089))
-print(sprintf('Removed %d rows', orig_n_rows-nrow(labor)))
-labor <- subset(x=labor, subset=!is.na(labor$DECISION_DATE))
-print(sprintf('Removed %d rows', orig_n_rows-nrow(labor)))
-
+labor <- clean_dataset()
 
 
 # change states to regions
@@ -55,6 +60,8 @@ for (k in 1:length(US_REGION_STATES)) {
 }
 labor$FOREIGN_WORKER_INFO_STATE[labor$FOREIGN_WORKER_INFO_STATE==""] <- 'NA'
 labor$FOREIGN_WORKER_INFO_STATE <- factor(labor$FOREIGN_WORKER_INFO_STATE, levels=US_REGION_LABELS)
+
+
 
 
 aicm<-glm(formula = CASE_STATUS ~ ADMIN + PW_AMOUNT_9089 + JOB_INFO_EXPERIENCE + JOB_INFO_EDUCATION

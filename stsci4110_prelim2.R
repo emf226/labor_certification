@@ -217,10 +217,13 @@ mosaic_plot <- function(xvar, ylabel, xlabel='Application Status', fontsize=26) 
   mosaic_df <- data.frame(x=labor[[xvar]], CASE_STATUS=labor$CASE_STATUS)
   mosaic <- ggplot(data=mosaic_df) +
     geom_mosaic(aes(x=product(x, CASE_STATUS), fill=x), na.rm=TRUE, show.legend=FALSE) + 
+    #scale_fill_manual(values = c('Obama'='#5D8AA8', 'Trump'='#F8756C'), aesthetics = c('colour', 'fill')) +
+    #scale_fill_manual(values = c('Y'='#006B3C', 'N'='#CD5C5C'), aesthetics = c('colour', 'fill')) +
     labs(x=xlabel, y=ylabel, title=sprintf('%s and %s', xlabel, ylabel)) +
     theme(axis.title=element_text(size=30), axis.text.x=element_text(size=30, face='bold')) +
     theme(axis.text.y=element_text(size=fontsize, face='bold')) +
     theme(plot.title=element_text(size=38, face='bold'))
+  
   ggsave(filename=sprintf('~/Dropbox/STSCI/STSCI4110/Prelim2/plots/%s_plot.png', xvar), plot=mosaic, width=13, height=10)
   return(mosaic)
 }

@@ -138,6 +138,21 @@ write.csv(subsets_to_df(subsets2), file='~/Dropbox/STSCI/STSCI4110/Prelim2/subse
 
 
 #univariate log regression tests and LR tests at 0.05 level
+#rename factors
+#define predictors as factors 
+
+admission <- as.factor(labor$CLASS_OF_ADMISSION)
+admission <- addNA(admission)
+admin <- as.factor(labor$ADMIN)
+pw_level <- as.factor(labor$PW_LEVEL_9089)
+job_ed <- as.factor(labor$JOB_INFO_EDUCATION)
+job_exp <- as.factor(labor$JOB_INFO_EXPERIENCE)
+rec_info_prof <- as.factor(labor$RECR_INFO_PROFESSIONAL_OCC)
+rec_infor_coll <- as.factor(labor$RECR_INFO_COLL_UNIV_TEACHER)
+region <- as.factor(labor$REGION)
+foreign_ed <- as.factor(labor$FOREIGN_WORKER_INFO_EDUCATION)
+foreign_state <- as.factor(labor$FOREIGN_WORKER_STATE)
+status <- as.factor(labor$CASE_STATUS)
 
 #labor$DECISION_DATE
 date_test <- glm(status ~ labor$DECISION_DATE, family = binomial)
@@ -217,13 +232,10 @@ mosaic_plot <- function(xvar, ylabel, xlabel='Application Status', fontsize=26) 
   mosaic_df <- data.frame(x=labor[[xvar]], CASE_STATUS=labor$CASE_STATUS)
   mosaic <- ggplot(data=mosaic_df) +
     geom_mosaic(aes(x=product(x, CASE_STATUS), fill=x), na.rm=TRUE, show.legend=FALSE) + 
-    #scale_fill_manual(values = c('Obama'='#5D8AA8', 'Trump'='#F8756C'), aesthetics = c('colour', 'fill')) +
-    #scale_fill_manual(values = c('Y'='#006B3C', 'N'='#CD5C5C'), aesthetics = c('colour', 'fill')) +
     labs(x=xlabel, y=ylabel, title=sprintf('%s and %s', xlabel, ylabel)) +
     theme(axis.title=element_text(size=30), axis.text.x=element_text(size=30, face='bold')) +
     theme(axis.text.y=element_text(size=fontsize, face='bold')) +
     theme(plot.title=element_text(size=38, face='bold'))
-  
   ggsave(filename=sprintf('~/Dropbox/STSCI/STSCI4110/Prelim2/plots/%s_plot.png', xvar), plot=mosaic, width=13, height=10)
   return(mosaic)
 }
@@ -263,23 +275,113 @@ ggsave(filename='~/Dropbox/STSCI/STSCI4110/plots/DECISION_DATE_plot.png', plot=d
 
 
 # R Code EMPIRICAL PROBS:
-AMNT.fac = factor(cut(labor$PW_AMOUNT_9089, c(14580, seq(20000,272854,by=11000)) ))
+table(labor$CASE_STATUS,AMNT.fac)
+
+AMNT.fac = factor(cut(labor$PW_AMOUNT_9089,c(14000,seq(20000,160000,by=20000),300000)))
 AMNT.fac
 table(AMNT.fac)
-e.probs = tapply(status,AMNT.fac,mean) ###< THIS IS THE PROBLEM
+head(labor$CASE_STATUS)
+length(labor$CASE_STATUS)
+a <- 1-(122/(122+133))
+b <- 1-(174/(174+241))
+c <- 1-(111/(328+111))
+d <- 1-(123/(711+123))
+e <- 1-(93/(890+93))
+f <- 1-(50/(50+631))
+g <- 1-(24/(24+235))
+e.probs <- c(a,b,c,d,e,f,g)
 e.probs
-p = rep(0,10)
-for (i in 1:22){
-  p[i] = e.probs[i]/table(AMNT.fac)[i]
-}
-p
+
+length(seq(14000,275000, by = 37500))
+       
 amnt <- glm(status ~ labor$PW_AMOUNT_9089, family="binomial")
 summary(amnt)
 beta0 = -0.0403
 beta1 = -0.00002148
-curve(expr = exp(beta0+beta1*x)/(1+exp(beta0+beta1*x)), xlim=c(14000,275000), ylim=c(0,1),
+curve(expr = 1-(exp(beta0+beta1*x)/(1+exp(beta0+beta1*x))), xlim=c(14000,275000), ylim=c(0,1),
       main="Admission Status", xlab = "Wage Amount", ylab = "Probability",
       col="blue")
-plot(seq(14000,275000, by = 12000), p ,main = "Status by Wage Amount", 
+plot(seq(14000,275000, by = 37500), e.probs ,main = "Status by Wage Amount", 
      xlab = "Wage", ylab = "Status", xlim=c(14000,275000), ylim=c(0,1))
+
+##FULL MODEL TESTING##
+library(MASS)
+fullp1<-glm(status~ admin + labor$DECISION_DATE + pw_level+ labor$PW_AMOUNT_9089 + job_ed + job_exp + rec_info_prof + rec_infor_coll + region + foreign_ed +foreign_state, family ="binomial", data=labor)
+labor<-na.omit(labor)
+stepAIC(fullp1)
+
+aicm<-glm(status ~ admin + labor$PW_AMOUNT_9089 + job_exp + job_ed +rec_info_prof +rec_infor_coll+region + labor$DECISION_DATE, family = binomial, data = labor)
+
+library(leaps)
+wowo=regsubsets(status~.,data=labor,really.big=T,nvmax=10)
+summary(wowo)
+
+AIC(subs)
+AIC(aicm)
+
+###INTERACTIONS PART 2 WITH ADMIN
+
+int<-glm(status~admin*pw_level+admin*labor$DECISION_DATE+admin*labor$PW_AMOUNT_9089+admin*job_ed+admin*job_exp+admin*rec_infor_coll+admin*rec_info_prof+admin*region+admin*foreign_ed+admin*foreign_state,family=binomial,data=labor)
+summary(int)
+
+#FINAL MODEL
+final <- glm(status ~ admin + labor$PW_AMOUNT_9089 + job_exp + job_ed +rec_info_prof +rec_infor_coll+region + labor$DECISION_DATE + admin*job_ed + admin*labor$DECISION_DATE + admin*region, family = binomial)
+summary(final)
+AIC(final)
+
+#GOODNESS OF FIT TEST
+1-pchisq(3178.9,3976)
+
+#ROC CURVE
+roc_table <- function(fitted_vals) {
+  thresholds <- seq(from=0.0, to=1.0, by=0.05)
+  roc <- data.frame(
+    threshold = thresholds, 
+    specificity = 1 - sapply(thresholds, FUN=function(t) {tnr(BINARY_CASE_STATUS, fitted_vals, cutoff=t) }),
+    sensitivity = sapply(thresholds, FUN=function(t) {tpr(BINARY_CASE_STATUS, fitted_vals, cutoff=t)})
+  )
+  return(roc)
+}
+
+
+aicm <- glm(formula = CASE_STATUS ~ ADMIN + PW_AMOUNT_9089 + JOB_INFO_EXPERIENCE + JOB_INFO_EDUCATION
+            + RECR_INFO_COLL_UNIV_TEACHER + RECR_INFO_PROFESSIONAL_OCC + REGION + DECISION_DATE, 
+            family = 'binomial', data=labor)
+interaction_model <- glm(CASE_STATUS~ ADMIN + PW_AMOUNT_9089 + JOB_INFO_EXPERIENCE + 
+           JOB_INFO_EDUCATION + RECR_INFO_COLL_UNIV_TEACHER + RECR_INFO_PROFESSIONAL_OCC + 
+           REGION + DECISION_DATE+ADMIN*JOB_INFO_EDUCATION+ADMIN*DECISION_DATE+ADMIN*REGION, family=binomial, data=labor)
+summary(interaction_model)
+AIC(interaction_model)
+
+
+roc_main <- roc_table(aicm$fitted.values)
+roc_interaction <- roc_table(interaction_model$fitted.values)
+
+roc <- data.frame(
+  Fit = c(rep('InteractionModel', nrow(roc_main)), rep('NoInteractionModel', nrow(roc_main)), rep('Random', nrow(roc_main))),
+  Sensitivity = c(roc_interaction$sensitivity,roc_main$sensitivity, roc_main$threshold),
+  Specificity = c(roc_interaction$specificity,  roc_main$specificity, roc_main$threshold)
+)
+
+roc_curve_plot <- ggplot(data=roc, aes(x=Specificity, y=Sensitivity)) + 
+  scale_fill_manual(
+    values     = c('InteractionModel'='#682F60', 'NoInteractionModel'='#B1972F', 'Random'='#000000'),
+    aesthetics = c('colour', 'fill')
+  ) +
+  geom_point(data=roc, aes(x=Specificity, y=Sensitivity, color=Fit), size=2.5) +
+  geom_line(data=roc, aes(x=Specificity, y=Sensitivity, color=Fit), size=2) +
+  ggtitle('ROC Curve') + xlab('1 - Specificity') + ylab('Sensitivity') +
+  theme(legend.title = element_text(size = 26), legend.text = element_text(size = 22)) +
+  theme(axis.title = element_text(size = 24), axis.text = element_text(size = 18)) +
+  theme(plot.title = element_text(size = 30, face='bold')) 
+
+roc_curve_plot
+ggsave(filename='~/Dropbox/STSCI/STSCI4110/Prelim2/plots/ROC_curve_plot.png', plot=roc_curve_plot, width=13, height=9)
+
+
+ModelMetrics::auc(aicm)
+ModelMetrics::auc(interaction_model)
+
+
+
 

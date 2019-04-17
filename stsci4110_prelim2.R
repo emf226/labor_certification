@@ -138,6 +138,21 @@ write.csv(subsets_to_df(subsets2), file='~/Dropbox/STSCI/STSCI4110/Prelim2/subse
 
 
 #univariate log regression tests and LR tests at 0.05 level
+#rename factors
+#define predictors as factors 
+
+admission <- as.factor(labor$CLASS_OF_ADMISSION)
+admission <- addNA(admission)
+admin <- as.factor(labor$ADMIN)
+pw_level <- as.factor(labor$PW_LEVEL_9089)
+job_ed <- as.factor(labor$JOB_INFO_EDUCATION)
+job_exp <- as.factor(labor$JOB_INFO_EXPERIENCE)
+rec_info_prof <- as.factor(labor$RECR_INFO_PROFESSIONAL_OCC)
+rec_infor_coll <- as.factor(labor$RECR_INFO_COLL_UNIV_TEACHER)
+region <- as.factor(labor$REGION)
+foreign_ed <- as.factor(labor$FOREIGN_WORKER_INFO_EDUCATION)
+foreign_state <- as.factor(labor$FOREIGN_WORKER_STATE)
+status <- as.factor(labor$CASE_STATUS)
 
 #labor$DECISION_DATE
 date_test <- glm(status ~ labor$DECISION_DATE, family = binomial)
@@ -260,23 +275,63 @@ ggsave(filename='~/Dropbox/STSCI/STSCI4110/plots/DECISION_DATE_plot.png', plot=d
 
 
 # R Code EMPIRICAL PROBS:
-AMNT.fac = factor(cut(labor$PW_AMOUNT_9089, c(14580, seq(20000,272854,by=11000)) ))
+table(labor$CASE_STATUS,AMNT.fac)
+
+AMNT.fac = factor(cut(labor$PW_AMOUNT_9089,c(14000,seq(20000,160000,by=20000),300000)))
 AMNT.fac
 table(AMNT.fac)
-e.probs = tapply(status,AMNT.fac,mean) ###< THIS IS THE PROBLEM
+head(labor$CASE_STATUS)
+length(labor$CASE_STATUS)
+a <- 1-(122/(122+133))
+b <- 1-(174/(174+241))
+c <- 1-(111/(328+111))
+d <- 1-(123/(711+123))
+e <- 1-(93/(890+93))
+f <- 1-(50/(50+631))
+g <- 1-(24/(24+235))
+e.probs <- c(a,b,c,d,e,f,g)
 e.probs
-p = rep(0,10)
-for (i in 1:22){
-  p[i] = e.probs[i]/table(AMNT.fac)[i]
-}
-p
+
+length(seq(14000,275000, by = 37500))
+       
 amnt <- glm(status ~ labor$PW_AMOUNT_9089, family="binomial")
 summary(amnt)
 beta0 = -0.0403
 beta1 = -0.00002148
-curve(expr = exp(beta0+beta1*x)/(1+exp(beta0+beta1*x)), xlim=c(14000,275000), ylim=c(0,1),
+curve(expr = 1-(exp(beta0+beta1*x)/(1+exp(beta0+beta1*x))), xlim=c(14000,275000), ylim=c(0,1),
       main="Admission Status", xlab = "Wage Amount", ylab = "Probability",
       col="blue")
-plot(seq(14000,275000, by = 12000), p ,main = "Status by Wage Amount", 
+plot(seq(14000,275000, by = 37500), e.probs ,main = "Status by Wage Amount", 
      xlab = "Wage", ylab = "Status", xlim=c(14000,275000), ylim=c(0,1))
+
+##FULL MODEL TESTING##
+library(MASS)
+fullp1<-glm(status~ admin + labor$DECISION_DATE + pw_level+ labor$PW_AMOUNT_9089 + job_ed + job_exp + rec_info_prof + rec_infor_coll + region + foreign_ed +foreign_state, family ="binomial", data=labor)
+labor<-na.omit(labor)
+stepAIC(fullp1)
+
+aicm<-glm(status ~ admin + labor$PW_AMOUNT_9089 + job_exp + job_ed +rec_info_prof +rec_infor_coll+region + labor$DECISION_DATE, family = binomial, data = labor)
+
+library(leaps)
+wowo=regsubsets(status~.,data=labor,really.big=T,nvmax=10)
+summary(wowo)
+
+AIC(subs)
+AIC(aicm)
+
+###INTERACTIONS PART 2 WITH ADMIN
+
+int<-glm(status~admin*pw_level+admin*labor$DECISION_DATE+admin*labor$PW_AMOUNT_9089+admin*job_ed+admin*job_exp+admin*rec_infor_coll+admin*rec_info_prof+admin*region+admin*foreign_ed+admin*foreign_state,family=binomial,data=labor)
+summary(int)
+
+#FINAL MODEL
+final <- glm(status ~ admin + labor$PW_AMOUNT_9089 + job_exp + job_ed +rec_info_prof +rec_infor_coll+region + labor$DECISION_DATE + admin*job_ed + admin*labor$DECISION_DATE + admin*region, family = binomial)
+summary(final)
+AIC(final)
+
+#GOODNESS OF FIT TEST
+1-pchisq(3178.9,3976)
+
+
+
 
